@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多噪音源聲壓計算 V2.3</title>
+    <!-- 載入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Google Fonts - Roboto Mono & Orbitron -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --metal-bg: #1a1a1a;
+            --panel-bg: #2a2a2a;
+            --accent-orange: #f59e0b;
+            --display-green: #00ff41;
+        }
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: var(--metal-bg);
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #d1d5db;
+        }
+        .industrial-panel {
+            background-color: var(--panel-bg);
+            border: 4px solid #3f3f46;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 10px 10px 0px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .rivet {
+            width: 8px;
+            height: 8px;
+            background: #4b5563;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: inset -1px -1px 2px rgba(0,0,0,0.8);
+        }
+        .display-screen {
+            background-color: #051a05;
+            border: 2px solid #4b5563;
+            color: var(--display-green);
+            text-shadow: 0 0 5px var(--display-green);
+            font-family: 'Orbitron', sans-serif;
+        }
+        @keyframes breath {
+            0%, 100% { opacity: 0.4; box-shadow: 0 0 2px rgba(34, 197, 94, 0.2); }
+            50% { opacity: 1; box-shadow: 0 0 10px rgba(34, 197, 94, 0.6); }
+        }
+        .animate-breath {
+            animation: breath 2s ease-in-out infinite;
+        }
+        .btn-industrial {
+            transition: all 0.1s;
+            border-bottom: 4px solid #b45309;
+        }
+        .btn-industrial:active {
+            transform: translateY(2px);
+            border-bottom: 0px;
+        }
+        .input-dark {
+            background: #111;
+            border: 1px solid #444;
+            color: var(--accent-orange);
+            font-size: 0.875rem;
+        }
+        .input-dark:focus {
+            outline: 2px solid var(--accent-orange);
+            background: #000;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+    </style>
+    <script>
+        // 禁止右鍵選單
+        document.addEventListener('contextmenu', function(event) {
+            event.preventDefault();
+        });
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ind-orange': '#f59e0b',
+                        'ind-dark': '#1a1a1a',
+                    }
+                }
+            }
+        }
+
+        let sourceCounter = 1;
+
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            svg: { fontCache: 'global' }
+        };
+
+        // 新增頻道
+        window.addSourceInput = function() {
+            const container = document.getElementById('source-inputs');
+            if (!container) return;
+
+            const newSource = document.createElement('div');
+            newSource.className = 'flex flex-col space-y-1 p-3 bg-black/20 rounded border border-white/5 shadow-inner w-full relative group';
+            const idSuffix = sourceCounter;
+            newSource.id = `source-${idSuffix}`;
+
+            newSource.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] font-black text-ind-orange/60 uppercase tracking-tighter">CHANNEL ${idSuffix}</span>
+                    <button type="button" onclick="window.removeSourceInput('source-${idSuffix}')"
+                            class="text-red-900/50 hover:text-red-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="flex flex-col">
+                        <label class="text-[8px] text-gray-500 uppercase">Input SPL (dB)</label>
+                        <input type="number" id="spl-input-${idSuffix}" value="70" step="0.1"
+                               oninput="window.calculateTotalSPL()"
+                               class="w-full input-dark rounded px-2 py-1 font-bold">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-[8px] text-gray-500 uppercase">Distance (m)</label>
+                        <input type="number" id="dist-input-${idSuffix}" value="1" min="0.01" step="0.1"
+                               oninput="window.calculateTotalSPL()"
+                               class="w-full input-dark rounded px-2 py-1 font-bold">
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(newSource);
+            sourceCounter++;
+            
+            setTimeout(() => {
+                window.calculateTotalSPL();
+            }, 0);
+        }
+
+        // 刪除頻道
+        window.removeSourceInput = function(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.remove();
+                window.calculateTotalSPL();
+            }
+        }
+
+        // 主要計算邏輯
+        window.calculateTotalSPL = function() {
+            const sourceElements = document.querySelectorAll('[id^="source-"]');
+            const targetDistInput = document.getElementById('target-distance');
+            // refDist 代表輸入的 SPL 是在幾米處測得的基準 (預設 1m)
+            const refDist = targetDistInput ? parseFloat(targetDistInput.value) : 1;
+            
+            let sumIntensity = 0;
+            let validSources = 0;
+            const logDetails = [];
+
+            sourceElements.forEach(el => {
+                const idParts = el.id.split('-');
+                if (idParts.length < 2) return;
+                
+                const idSuffix = idParts[1];
+                const splEl = document.getElementById(`spl-input-${idSuffix}`);
+                const distEl = document.getElementById(`dist-input-${idSuffix}`);
+
+                if (splEl && distEl) {
+                    const splValue = parseFloat(splEl.value);
+                    const r_actual = parseFloat(distEl.value); 
+
+                    if (!isNaN(splValue) && !isNaN(r_actual) && r_actual > 0 && refDist > 0) {
+                        /**
+                         * 物理公式核心邏輯：
+                         * Lp_actual = Lp_ref - 20 * log10(r_actual / r_ref)
+                         * * 當 r_actual 變小時 (例如 0.1m)，log10(0.1/1) = -1
+                         * Lp_actual = splValue - 20 * (-1) = splValue + 20
+                         * 結果變大，符合物理直覺。
+                         */
+                        const compensatedSPL = splValue - 20 * Math.log10(r_actual / refDist);
+                        sumIntensity += Math.pow(10, compensatedSPL / 10);
+                        
+                        logDetails.push({
+                            ch: idSuffix,
+                            orig: splValue,
+                            dist: r_actual,
+                            comp: compensatedSPL
+                        });
+                        validSources++;
+                    }
+                }
+            });
+
+            const resultDisplay = document.getElementById('total-spl-display');
+            const resultOutput = document.getElementById('result-output');
+
+            if (!resultDisplay || !resultOutput) return;
+
+            if (validSources === 0) {
+                resultDisplay.textContent = '--';
+                resultOutput.innerHTML = `<p class="text-red-500 text-[10px]">[系統錯誤]: 無輸入數據</p>`;
+                return;
+            }
+
+            const totalSPL = 10 * Math.log10(sumIntensity);
+            resultDisplay.textContent = `${totalSPL.toFixed(2)}`;
+
+            let logsHtml = logDetails.map(item => `
+                <div class="mb-1 p-1 bg-white/5 rounded text-[9px] border-l-2 border-ind-orange/30">
+                    <span class="text-ind-orange font-bold">CH${item.ch}:</span> ${item.orig}dB (Ref@${refDist}m) 
+                    <span class="text-gray-400"> → 於 ${item.dist}m 處觀察為: </span>
+                    <span class="${item.dist < refDist ? 'text-green-400' : 'text-blue-400'} font-bold">
+                        ${item.comp.toFixed(1)}dB ${item.dist < refDist ? '↑' : '↓'}
+                    </span>
+                </div>
+            `).join('');
+
+            resultOutput.innerHTML = `
+                <div class="mb-2 border-b border-gray-700 pb-1 text-[10px] text-orange-500 font-bold uppercase tracking-widest">Acoustic Logic Analysis</div>
+                <div class="text-[9px] text-gray-500 mb-2 italic">Ref Distance (r_ref): ${refDist}m</div>
+                <div class="max-h-40 overflow-y-auto custom-scrollbar">${logsHtml}</div>
+                <div class="mt-2 pt-2 border-t border-gray-800 text-xs text-green-500 font-bold">COMPUTATION SYNCED</div>
+            `;
+
+            window.renderMathJax();
+        }
+
+        window.renderMathJax = function() {
+            if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+                window.MathJax.typesetPromise().catch((err) => console.log('MathJax Error:', err));
+            }
+        }
+
+        window.onload = () => {
+            // 初始化四個頻道
+            for(let i=0; i<4; i++) window.addSourceInput();
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
+</head>
+<body class="p-4 sm:p-10 min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-4xl industrial-panel p-6 sm:p-10">
+        <div class="rivet top-2 left-2"></div>
+        <div class="rivet top-2 right-2"></div>
+        <div class="rivet bottom-2 left-2"></div>
+        <div class="rivet bottom-2 right-2"></div>
+
+        <header class="mb-8 border-l-8 border-ind-orange pl-6">
+            <h1 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter italic">
+                Acoustic Summation Console V2.3
+            </h1>
+            <p class="text-gray-500 text-[10px] mt-1 tracking-widest font-bold">
+                REINFORCED PHYSICS ENGINE // CREATED BY RANDY CHEN
+            </p>
+        </header>
+
+        <!-- 結果顯示面板 -->
+        <div class="display-screen p-6 rounded-lg mb-8 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
+            <div class="flex flex-col sm:flex-row items-baseline justify-between relative z-10">
+                <div>
+                    <h2 class="text-[10px] font-black text-green-400 uppercase mb-3 italic tracking-[0.2em] flex items-center">
+                        <span class="w-2 h-2 bg-green-500 mr-2 animate-pulse"></span>
+                        TOTAL OBSERVED SPL (dB)
+                    </h2>
+                    <div id="total-spl-display" class="text-5xl sm:text-7xl font-bold leading-none tracking-tighter">--</div>
+                </div>
+                <div class="flex flex-col items-end space-y-2 mt-4 sm:mt-0">
+                    <span class="text-[10px] bg-green-950 border border-green-500/50 px-2 py-1 rounded text-green-400 font-bold animate-breath">DYNAMICS ENABLED</span>
+                    <div class="bg-black/40 p-2 border border-green-900/50 rounded flex flex-col items-end">
+                        <label class="text-[9px] text-green-700 font-bold uppercase mb-1 italic">Input SPL Ref. Dist (m)</label>
+                        <input type="number" id="target-distance" value="1" min="0.1" step="0.1" 
+                               oninput="window.calculateTotalSPL()"
+                               class="w-20 bg-black text-green-400 text-right font-bold border-b border-green-800 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- 輸入區 -->
+            <section class="lg:col-span-8">
+                <h3 class="text-sm font-bold text-ind-orange uppercase mb-4 flex items-center">
+                    <span class="mr-2 inline-block w-2 h-2 bg-ind-orange"></span>
+                    Channel Matrix
+                </h3>
+                
+                <div id="source-inputs" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
+                    <!-- JS 動態插入 -->
+                </div>
+
+                <button onclick="window.addSourceInput()"
+                        class="mt-6 w-full py-3 bg-gray-800 text-gray-300 text-xs font-bold uppercase border border-gray-600 hover:bg-gray-700 hover:text-white transition-all shadow-lg active:scale-95">
+                    + Add New Source Channel
+                </button>
+            </section>
+
+            <!-- 操作區 -->
+            <section class="lg:col-span-4 flex flex-col">
+                <h3 class="text-sm font-bold text-ind-orange uppercase mb-4 tracking-tighter">Telemetry Output</h3>
+                
+                <button onclick="window.calculateTotalSPL()"
+                        class="w-full py-5 bg-ind-orange text-black font-black text-xl uppercase btn-industrial mb-6 italic tracking-widest shadow-xl">
+                    Refresh Logic
+                </button>
+
+                <div id="result-output" class="flex-grow p-4 bg-black/50 border border-gray-800 rounded-lg font-mono text-[10px] overflow-y-auto min-h-[200px] shadow-inner">
+                    <p class="text-gray-600 italic">// Waiting for signal...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- 頁尾數學公式 -->
+        <footer class="mt-10 pt-6 border-t border-gray-800 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Inverse Square Physics</h4>
+                <div class="text-[10px] text-gray-400 bg-black/20 p-4 rounded-lg border border-white/5 shadow-inner">
+                    $$L_{p, \text{actual}} = L_{p, \text{ref}} - 20 \log_{10}(r_{\text{actual}} / r_{\text{ref}})$$
+                </div>
+            </div>
+            <div class="text-[10px] text-gray-600 leading-relaxed uppercase flex items-center">
+                <p>物理說明：當 Channel 距離 $r_{\text{actual}}$ 縮小時，代表音源更靠近觀察者。根據反平方律，觀察到的音壓會增加。系統將所有音源貢獻校正後進行能量疊加。</p>
+            </div>
+        </footer>
+    </div>
+
+</body>
+</html>
