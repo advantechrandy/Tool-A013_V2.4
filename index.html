@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多噪音源聲壓計算 V2.3</title>
+    <title>多噪音源聲壓計算 V2.4</title>
     <!-- 載入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 載入 Google Fonts - Roboto Mono & Orbitron -->
@@ -131,7 +131,7 @@
                                class="w-full input-dark rounded px-2 py-1 font-bold">
                     </div>
                     <div class="flex flex-col">
-                        <label class="text-[8px] text-gray-500 uppercase">Distance (m)</label>
+                        <label class="text-[8px] text-gray-500 uppercase">Measure Dist. (m)</label>
                         <input type="number" id="dist-input-${idSuffix}" value="1" min="0.01" step="0.1"
                                oninput="window.calculateTotalSPL()"
                                class="w-full input-dark rounded px-2 py-1 font-bold">
@@ -156,12 +156,19 @@
             }
         }
 
-        // 主要計算邏輯
+        /**
+         * 主要計算邏輯
+         * 修正後邏輯：
+         * 頻道內的「Input SPL」是在「Measure Dist.」處測得。
+         * 系統將所有頻道音效校正到「Target Observation Distance」處，然後進行能量疊加。
+         * 公式：Lp_at_target = Lp_input - 20 * log10(target_dist / measure_dist)
+         */
         window.calculateTotalSPL = function() {
             const sourceElements = document.querySelectorAll('[id^="source-"]');
             const targetDistInput = document.getElementById('target-distance');
-            // refDist 代表輸入的 SPL 是在幾米處測得的基準 (預設 1m)
-            const refDist = targetDistInput ? parseFloat(targetDistInput.value) : 1;
+            
+            // 觀測目標距離 (r_target)
+            const targetDist = targetDistInput ? parseFloat(targetDistInput.value) : 1;
             
             let sumIntensity = 0;
             let validSources = 0;
@@ -176,24 +183,19 @@
                 const distEl = document.getElementById(`dist-input-${idSuffix}`);
 
                 if (splEl && distEl) {
-                    const splValue = parseFloat(splEl.value);
-                    const r_actual = parseFloat(distEl.value); 
+                    const lp_input = parseFloat(splEl.value);
+                    const r_measure = parseFloat(distEl.value); 
 
-                    if (!isNaN(splValue) && !isNaN(r_actual) && r_actual > 0 && refDist > 0) {
-                        /**
-                         * 物理公式核心邏輯：
-                         * Lp_actual = Lp_ref - 20 * log10(r_actual / r_ref)
-                         * * 當 r_actual 變小時 (例如 0.1m)，log10(0.1/1) = -1
-                         * Lp_actual = splValue - 20 * (-1) = splValue + 20
-                         * 結果變大，符合物理直覺。
-                         */
-                        const compensatedSPL = splValue - 20 * Math.log10(r_actual / refDist);
+                    if (!isNaN(lp_input) && !isNaN(r_measure) && r_measure > 0 && targetDist > 0) {
+                        // 反比關係核心：距離增加一倍，聲壓減少 6dB
+                        // Lp_at_target = Lp_input - 20 * log10(targetDist / r_measure)
+                        const compensatedSPL = lp_input - 20 * Math.log10(targetDist / r_measure);
                         sumIntensity += Math.pow(10, compensatedSPL / 10);
                         
                         logDetails.push({
                             ch: idSuffix,
-                            orig: splValue,
-                            dist: r_actual,
+                            orig: lp_input,
+                            mDist: r_measure,
                             comp: compensatedSPL
                         });
                         validSources++;
@@ -217,17 +219,17 @@
 
             let logsHtml = logDetails.map(item => `
                 <div class="mb-1 p-1 bg-white/5 rounded text-[9px] border-l-2 border-ind-orange/30">
-                    <span class="text-ind-orange font-bold">CH${item.ch}:</span> ${item.orig}dB (Ref@${refDist}m) 
-                    <span class="text-gray-400"> → 於 ${item.dist}m 處觀察為: </span>
-                    <span class="${item.dist < refDist ? 'text-green-400' : 'text-blue-400'} font-bold">
-                        ${item.comp.toFixed(1)}dB ${item.dist < refDist ? '↑' : '↓'}
+                    <span class="text-ind-orange font-bold">CH${item.ch}:</span> ${item.orig}dB (@${item.mDist}m) 
+                    <span class="text-gray-400"> → 於觀測點 ${targetDist}m 處為: </span>
+                    <span class="${targetDist < item.mDist ? 'text-green-400' : 'text-blue-400'} font-bold">
+                        ${item.comp.toFixed(1)}dB ${targetDist < item.mDist ? '↑' : '↓'}
                     </span>
                 </div>
             `).join('');
 
             resultOutput.innerHTML = `
                 <div class="mb-2 border-b border-gray-700 pb-1 text-[10px] text-orange-500 font-bold uppercase tracking-widest">Acoustic Logic Analysis</div>
-                <div class="text-[9px] text-gray-500 mb-2 italic">Ref Distance (r_ref): ${refDist}m</div>
+                <div class="text-[9px] text-gray-500 mb-2 italic">Target Observation Dist: ${targetDist}m</div>
                 <div class="max-h-40 overflow-y-auto custom-scrollbar">${logsHtml}</div>
                 <div class="mt-2 pt-2 border-t border-gray-800 text-xs text-green-500 font-bold">COMPUTATION SYNCED</div>
             `;
@@ -258,10 +260,10 @@
 
         <header class="mb-8 border-l-8 border-ind-orange pl-6">
             <h1 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter italic">
-                Acoustic Summation Console V2.3
+                Acoustic Summation Console V2.4
             </h1>
             <p class="text-gray-500 text-[10px] mt-1 tracking-widest font-bold">
-                REINFORCED PHYSICS ENGINE // CREATED BY RANDY CHEN
+                INVERSE SQUARE PHYSICS // REINFORCED BY RANDY CHEN
             </p>
         </header>
 
@@ -279,7 +281,7 @@
                 <div class="flex flex-col items-end space-y-2 mt-4 sm:mt-0">
                     <span class="text-[10px] bg-green-950 border border-green-500/50 px-2 py-1 rounded text-green-400 font-bold animate-breath">DYNAMICS ENABLED</span>
                     <div class="bg-black/40 p-2 border border-green-900/50 rounded flex flex-col items-end">
-                        <label class="text-[9px] text-green-700 font-bold uppercase mb-1 italic">Input SPL Ref. Dist (m)</label>
+                        <label class="text-[9px] text-green-700 font-bold uppercase mb-1 italic">Target Obs. Dist (m)</label>
                         <input type="number" id="target-distance" value="1" min="0.1" step="0.1" 
                                oninput="window.calculateTotalSPL()"
                                class="w-20 bg-black text-green-400 text-right font-bold border-b border-green-800 focus:outline-none">
@@ -326,11 +328,11 @@
             <div>
                 <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Inverse Square Physics</h4>
                 <div class="text-[10px] text-gray-400 bg-black/20 p-4 rounded-lg border border-white/5 shadow-inner">
-                    $$L_{p, \text{actual}} = L_{p, \text{ref}} - 20 \log_{10}(r_{\text{actual}} / r_{\text{ref}})$$
+                    $$L_{p, \text{target}} = L_{p, \text{measure}} - 20 \log_{10}(r_{\text{target}} / r_{\text{measure}})$$
                 </div>
             </div>
             <div class="text-[10px] text-gray-600 leading-relaxed uppercase flex items-center">
-                <p>物理說明：當 Channel 距離 $r_{\text{actual}}$ 縮小時，代表音源更靠近觀察者。根據反平方律，觀察到的音壓會增加。系統將所有音源貢獻校正後進行能量疊加。</p>
+                <p>物理說明：噪音音壓與觀測距離呈反比關係。當觀測點距離 $r_{\text{target}}$ 小於原始測量距離 $r_{\text{measure}}$ 時，聲壓會增加；反之則隨距離增加而衰減。本控制台將所有頻道源校正至統一觀測點後進行分貝能量疊加。</p>
             </div>
         </footer>
     </div>
