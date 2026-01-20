@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多噪音源聲壓計算 V2.4</title>
+    <title>多噪音源聲壓計算</title>
     <!-- 載入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 載入 Google Fonts - Roboto Mono & Orbitron -->
@@ -14,6 +14,7 @@
             --panel-bg: #2a2a2a;
             --accent-orange: #f59e0b;
             --display-green: #00ff41;
+            --display-blue: #00f2ff;
         }
         body {
             font-family: 'Roboto Mono', monospace;
@@ -43,6 +44,11 @@
             text-shadow: 0 0 5px var(--display-green);
             font-family: 'Orbitron', sans-serif;
         }
+        .display-screen.blue-tint {
+            background-color: #05151a;
+            color: var(--display-blue);
+            text-shadow: 0 0 5px var(--display-blue);
+        }
         @keyframes breath {
             0%, 100% { opacity: 0.4; box-shadow: 0 0 2px rgba(34, 197, 94, 0.2); }
             50% { opacity: 1; box-shadow: 0 0 10px rgba(34, 197, 94, 0.6); }
@@ -62,7 +68,6 @@
             background: #111;
             border: 1px solid #444;
             color: var(--accent-orange);
-            font-size: 0.875rem;
         }
         .input-dark:focus {
             outline: 2px solid var(--accent-orange);
@@ -80,7 +85,7 @@
         }
     </style>
     <script>
-        // 禁止右鍵選單
+        // 阻擋滑鼠右鍵選單
         document.addEventListener('contextmenu', function(event) {
             event.preventDefault();
         });
@@ -99,55 +104,44 @@
         let sourceCounter = 1;
 
         window.MathJax = {
-            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-            svg: { fontCache: 'global' }
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            }
         };
 
-        // 新增頻道
         window.addSourceInput = function() {
             const container = document.getElementById('source-inputs');
-            if (!container) return;
-
             const newSource = document.createElement('div');
-            newSource.className = 'flex flex-col space-y-1 p-3 bg-black/20 rounded border border-white/5 shadow-inner w-full relative group';
-            const idSuffix = sourceCounter;
-            newSource.id = `source-${idSuffix}`;
+            newSource.className = 'flex flex-col space-y-1 p-3 bg-black/20 rounded border border-white/5 shadow-inner w-full relative';
+            newSource.id = `source-${sourceCounter}`;
 
             newSource.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <span class="text-[10px] font-black text-ind-orange/60 uppercase tracking-tighter">CHANNEL ${idSuffix}</span>
-                    <button type="button" onclick="window.removeSourceInput('source-${idSuffix}')"
-                            class="text-red-900/50 hover:text-red-500 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] font-black text-ind-orange/60 uppercase tracking-tighter">Channel ${sourceCounter}</span>
+                    <button type="button" onclick="removeSourceInput('${newSource.id}')"
+                            class="text-red-900/50 hover:text-red-500 p-1 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div class="flex flex-col">
-                        <label class="text-[8px] text-gray-500 uppercase">Input SPL (dB)</label>
-                        <input type="number" id="spl-input-${idSuffix}" value="70" step="0.1"
-                               oninput="window.calculateTotalSPL()"
-                               class="w-full input-dark rounded px-2 py-1 font-bold">
+                        <label class="text-[8px] text-gray-500 uppercase font-bold">SPL (dB)</label>
+                        <input type="number" class="spl-val input-dark rounded px-2 py-1 font-bold text-sm" value="70" step="0.1" oninput="window.calculateTotalSPL()">
                     </div>
                     <div class="flex flex-col">
-                        <label class="text-[8px] text-gray-500 uppercase">Measure Dist. (m)</label>
-                        <input type="number" id="dist-input-${idSuffix}" value="1" min="0.01" step="0.1"
-                               oninput="window.calculateTotalSPL()"
-                               class="w-full input-dark rounded px-2 py-1 font-bold">
+                        <label class="text-[8px] text-gray-500 uppercase font-bold">Dist (M)</label>
+                        <input type="number" class="dist-val input-dark rounded px-2 py-1 font-bold text-sm" value="1" step="0.1" min="0.01" oninput="window.calculateTotalSPL()">
                     </div>
                 </div>
             `;
 
             container.appendChild(newSource);
             sourceCounter++;
-            
-            setTimeout(() => {
-                window.calculateTotalSPL();
-            }, 0);
+            window.calculateTotalSPL();
         }
 
-        // 刪除頻道
         window.removeSourceInput = function(id) {
             const element = document.getElementById(id);
             if (element) {
@@ -156,96 +150,67 @@
             }
         }
 
-        /**
-         * 主要計算邏輯
-         * 修正後邏輯：
-         * 頻道內的「Input SPL」是在「Measure Dist.」處測得。
-         * 系統將所有頻道音效校正到「Target Observation Distance」處，然後進行能量疊加。
-         * 公式：Lp_at_target = Lp_input - 20 * log10(target_dist / measure_dist)
-         */
         window.calculateTotalSPL = function() {
-            const sourceElements = document.querySelectorAll('[id^="source-"]');
-            const targetDistInput = document.getElementById('target-distance');
+            const sourceElements = document.querySelectorAll('#source-inputs > div');
+            const targetDistance = parseFloat(document.getElementById('target-distance').value) || 1;
             
-            // 觀測目標距離 (r_target)
-            const targetDist = targetDistInput ? parseFloat(targetDistInput.value) : 1;
-            
-            let sumIntensity = 0;
+            let totalIntensityAtTarget = 0;
             let validSources = 0;
-            const logDetails = [];
+            const logData = [];
 
-            sourceElements.forEach(el => {
-                const idParts = el.id.split('-');
-                if (idParts.length < 2) return;
-                
-                const idSuffix = idParts[1];
-                const splEl = document.getElementById(`spl-input-${idSuffix}`);
-                const distEl = document.getElementById(`dist-input-${idSuffix}`);
+            sourceElements.forEach((el, index) => {
+                const spl = parseFloat(el.querySelector('.spl-val').value);
+                const dist = parseFloat(el.querySelector('.dist-val').value);
 
-                if (splEl && distEl) {
-                    const lp_input = parseFloat(splEl.value);
-                    const r_measure = parseFloat(distEl.value); 
-
-                    if (!isNaN(lp_input) && !isNaN(r_measure) && r_measure > 0 && targetDist > 0) {
-                        // 反比關係核心：距離增加一倍，聲壓減少 6dB
-                        // Lp_at_target = Lp_input - 20 * log10(targetDist / r_measure)
-                        const compensatedSPL = lp_input - 20 * Math.log10(targetDist / r_measure);
-                        sumIntensity += Math.pow(10, compensatedSPL / 10);
-                        
-                        logDetails.push({
-                            ch: idSuffix,
-                            orig: lp_input,
-                            mDist: r_measure,
-                            comp: compensatedSPL
-                        });
-                        validSources++;
-                    }
+                if (!isNaN(spl) && !isNaN(dist) && dist > 0) {
+                    // 1. 將量測點的 SPL 換算回 1 米處的 SPL (L1 = L2 + 20log(r2/r1))
+                    // 2. 再換算到目標距離的 SPL (L_target = L_1m - 20log(target_dist))
+                    // 簡化：L_target = spl - 20*log10(targetDistance / dist)
+                    const splAtTarget = spl - 20 * Math.log10(targetDistance / dist);
+                    totalIntensityAtTarget += Math.pow(10, splAtTarget / 10);
+                    
+                    logData.push({ch: index + 1, val: splAtTarget});
+                    validSources++;
                 }
             });
 
             const resultDisplay = document.getElementById('total-spl-display');
+            const systemDisplay = document.getElementById('system-spl-display');
             const resultOutput = document.getElementById('result-output');
-
-            if (!resultDisplay || !resultOutput) return;
 
             if (validSources === 0) {
                 resultDisplay.textContent = '--';
-                resultOutput.innerHTML = `<p class="text-red-500 text-[10px]">[系統錯誤]: 無輸入數據</p>`;
+                systemDisplay.textContent = '--';
+                resultOutput.innerHTML = `<p class="text-red-500 text-[10px]">[系統錯誤]: 無有效輸入</p>`;
                 return;
             }
 
-            const totalSPL = 10 * Math.log10(sumIntensity);
-            resultDisplay.textContent = `${totalSPL.toFixed(2)}`;
+            const totalSPL = 10 * Math.log10(totalIntensityAtTarget);
+            const systemSPL = totalSPL + 3;
 
-            let logsHtml = logDetails.map(item => `
-                <div class="mb-1 p-1 bg-white/5 rounded text-[9px] border-l-2 border-ind-orange/30">
-                    <span class="text-ind-orange font-bold">CH${item.ch}:</span> ${item.orig}dB (@${item.mDist}m) 
-                    <span class="text-gray-400"> → 於觀測點 ${targetDist}m 處為: </span>
-                    <span class="${targetDist < item.mDist ? 'text-green-400' : 'text-blue-400'} font-bold">
-                        ${item.comp.toFixed(1)}dB ${targetDist < item.mDist ? '↑' : '↓'}
-                    </span>
-                </div>
-            `).join('');
+            resultDisplay.textContent = totalSPL.toFixed(2);
+            systemDisplay.textContent = systemSPL.toFixed(2);
+
+            let intensityList = logData.map(item => {
+                return `<span class="inline-block mr-2 mb-1 px-1 bg-white/5 rounded text-[9px] text-gray-400 font-mono">CH${item.ch}➔Target: ${item.val.toFixed(1)}dB</span>`;
+            }).join(' ');
 
             resultOutput.innerHTML = `
-                <div class="mb-2 border-b border-gray-700 pb-1 text-[10px] text-orange-500 font-bold uppercase tracking-widest">Acoustic Logic Analysis</div>
-                <div class="text-[9px] text-gray-500 mb-2 italic">Target Observation Dist: ${targetDist}m</div>
-                <div class="max-h-40 overflow-y-auto custom-scrollbar">${logsHtml}</div>
-                <div class="mt-2 pt-2 border-t border-gray-800 text-xs text-green-500 font-bold">COMPUTATION SYNCED</div>
+                <div class="mb-2 border-b border-gray-700 pb-1 text-[10px] text-orange-500 font-bold uppercase tracking-widest">Acoustic Logs</div>
+                <div class="text-[9px] text-gray-500 mb-2 italic">計算目標距離: ${targetDistance} M</div>
+                <div class="flex flex-wrap">${intensityList}</div>
+                <div class="mt-2 pt-2 border-t border-gray-800 text-xs text-green-500 font-bold uppercase">計算完成</div>
+                <div class="text-[9px] text-gray-400 mt-2 bg-blue-900/20 p-2 rounded border border-blue-500/20 leading-relaxed">
+                    <span class="text-blue-400 font-bold">[系統增益說明]</span><br>
+                    實際置於系統內部時，受空間反射與共振影響，音壓通常會較自由場理論值高出 <span class="text-white font-bold">+3dB</span>。
+                </div>
             `;
-
-            window.renderMathJax();
-        }
-
-        window.renderMathJax = function() {
-            if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
-                window.MathJax.typesetPromise().catch((err) => console.log('MathJax Error:', err));
-            }
         }
 
         window.onload = () => {
-            // 初始化四個頻道
-            for(let i=0; i<4; i++) window.addSourceInput();
+            window.addSourceInput();
+            window.addSourceInput();
+            window.calculateTotalSPL();
         };
     </script>
     <script id="MathJax-script" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
@@ -258,34 +223,50 @@
         <div class="rivet bottom-2 left-2"></div>
         <div class="rivet bottom-2 right-2"></div>
 
-        <header class="mb-8 border-l-8 border-ind-orange pl-6">
-            <h1 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter italic">
-                Acoustic Summation Console V2.4
-            </h1>
-            <p class="text-gray-500 text-[10px] mt-1 tracking-widest font-bold">
-                INVERSE SQUARE PHYSICS // CREATOR: RANDY CHEN
-            </p>
+        <header class="mb-8 border-l-8 border-ind-orange pl-6 flex flex-col md:flex-row md:items-end md:justify-between">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter italic">
+                    Acoustic Summation Console V2.3
+                </h1>
+                <p class="text-gray-500 text-[10px] mt-1 tracking-widest font-bold">
+                    PER-CHANNEL DISTANCE MATRIX // CREATOR: ADV RANDY CHEN
+                </p>
+            </div>
+            <!-- 目標距離設定 -->
+            <div class="mt-4 md:mt-0 flex items-center space-x-3 bg-black/40 px-4 py-2 rounded border border-gray-700 shadow-inner">
+                <label for="target-distance" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Target Distance:</label>
+                <div class="flex items-center">
+                    <input type="number" id="target-distance" value="1" min="0.01" step="0.1" 
+                           oninput="window.calculateTotalSPL()"
+                           class="w-16 bg-transparent text-ind-orange font-black text-xl focus:outline-none text-right">
+                    <span class="ml-1 text-[10px] text-gray-600 font-bold">M</span>
+                </div>
+            </div>
         </header>
 
-        <!-- 結果顯示面板 -->
-        <div class="display-screen p-6 rounded-lg mb-8 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
-            <div class="flex flex-col sm:flex-row items-baseline justify-between relative z-10">
-                <div>
-                    <h2 class="text-[10px] font-black text-green-400 uppercase mb-3 italic tracking-[0.2em] flex items-center">
-                        <span class="w-2 h-2 bg-green-500 mr-2 animate-pulse"></span>
-                        TOTAL OBSERVED SPL (dB)
-                    </h2>
-                    <div id="total-spl-display" class="text-5xl sm:text-7xl font-bold leading-none tracking-tighter">--</div>
+        <!-- 結果顯示區 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div class="display-screen p-6 rounded-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
+                <h2 class="text-[10px] font-black text-green-400 uppercase mb-3 italic tracking-[0.2em] flex items-center">
+                    <span class="w-2 h-2 bg-green-500 mr-2 animate-pulse"></span>
+                    Summed SPL at Target
+                </h2>
+                <div class="flex items-baseline">
+                    <div id="total-spl-display" class="text-5xl sm:text-6xl font-bold leading-none tracking-tighter">--</div>
+                    <span class="ml-2 text-sm text-green-900 font-bold">dB</span>
                 </div>
-                <div class="flex flex-col items-end space-y-2 mt-4 sm:mt-0">
-                    <span class="text-[10px] bg-green-950 border border-green-500/50 px-2 py-1 rounded text-green-400 font-bold animate-breath">DYNAMICS ENABLED</span>
-                    <div class="bg-black/40 p-2 border border-green-900/50 rounded flex flex-col items-end">
-                        <label class="text-[9px] text-green-700 font-bold uppercase mb-1 italic">Target Obs. Dist (m)</label>
-                        <input type="number" id="target-distance" value="1" min="0.1" step="0.1" 
-                               oninput="window.calculateTotalSPL()"
-                               class="w-20 bg-black text-green-400 text-right font-bold border-b border-green-800 focus:outline-none">
-                    </div>
+            </div>
+
+            <div class="display-screen blue-tint p-6 rounded-lg relative overflow-hidden border-blue-500/50">
+                <div class="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
+                <h2 class="text-[10px] font-black text-blue-400 uppercase mb-3 italic tracking-[0.2em] flex items-center">
+                    <span class="w-2 h-2 bg-blue-500 mr-2 animate-breath"></span>
+                    In-System Estimated (+3dB)
+                </h2>
+                <div class="flex items-baseline">
+                    <div id="system-spl-display" class="text-5xl sm:text-6xl font-bold leading-none tracking-tighter">--</div>
+                    <span class="ml-2 text-sm text-blue-900 font-bold">dB</span>
                 </div>
             </div>
         </div>
@@ -298,27 +279,27 @@
                     Channel Matrix
                 </h3>
                 
-                <div id="source-inputs" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
-                    <!-- JS 動態插入 -->
+                <div id="source-inputs" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-3 custom-scrollbar">
+                    <!-- JS Injected -->
                 </div>
 
-                <button onclick="window.addSourceInput()"
+                <button onclick="addSourceInput()"
                         class="mt-6 w-full py-3 bg-gray-800 text-gray-300 text-xs font-bold uppercase border border-gray-600 hover:bg-gray-700 hover:text-white transition-all shadow-lg active:scale-95">
-                    + Add New Source Channel
+                    + Add Noise Source Channel
                 </button>
             </section>
 
             <!-- 操作區 -->
             <section class="lg:col-span-4 flex flex-col">
-                <h3 class="text-sm font-bold text-ind-orange uppercase mb-4 tracking-tighter">Telemetry Output</h3>
+                <h3 class="text-sm font-bold text-ind-orange uppercase mb-4">Diagnostics</h3>
                 
-                <button onclick="window.calculateTotalSPL()"
+                <button onclick="calculateTotalSPL()"
                         class="w-full py-5 bg-ind-orange text-black font-black text-xl uppercase btn-industrial mb-6 italic tracking-widest shadow-xl">
-                    Refresh Logic
+                    Sync & Sum
                 </button>
 
-                <div id="result-output" class="flex-grow p-4 bg-black/50 border border-gray-800 rounded-lg font-mono text-[10px] overflow-y-auto min-h-[200px] shadow-inner">
-                    <p class="text-gray-600 italic">// Waiting for signal...</p>
+                <div id="result-output" class="flex-grow p-4 bg-black/50 border border-gray-800 rounded-lg font-mono text-[10px] overflow-y-auto min-h-[150px] shadow-inner">
+                    <p class="text-gray-600 italic">// Waiting for input...</p>
                 </div>
             </section>
         </div>
@@ -326,18 +307,17 @@
         <!-- 頁尾數學公式 -->
         <footer class="mt-10 pt-6 border-t border-gray-800 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Inverse Square Physics</h4>
-                <div class="text-[10px] text-gray-400 bg-black/20 p-4 rounded-lg border border-white/5 shadow-inner">
-                    $$L_{p, \text{target}} = L_{p, \text{measure}} - 20 \log_{10}(r_{\text{target}} / r_{\text{measure}})$$
+                <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Distance Correction Logic</h4>
+                <div class="text-sm text-gray-400 bg-black/20 p-4 rounded-lg border border-white/5 shadow-inner">
+                    $$L_{target} = 10 \log_{10} \sum 10^{(L_i - 20 \log_{10}(r_{target}/r_i))/10}$$
                 </div>
             </div>
-            <div class="text-[10px] text-gray-600 leading-relaxed uppercase flex items-center">
-                <p>物理說明：噪音音壓與觀測距離呈反比關係。當觀測點距離 $r_{\text{target}}$ 小於原始測量距離 $r_{\text{measure}}$ 時，聲壓會增加；反之則隨距離增加而衰減。本控制台將所有頻道源校正至統一觀測點後進行分貝能量疊加。</p>
+            <div class="text-[10px] text-gray-600 leading-relaxed uppercase flex flex-col justify-center">
+                <p class="mb-2 italic">公式說明：將各通道在特定距離 ($r_i$) 量測之 SPL 換算至統一目標距離 ($r_{target}$) 後進行能量加總。</p>
+                <p class="text-blue-500/80 font-bold">※ 預估增益：系統內由於聲波無法完全擴散，反射能量會導致實測值比理論計算高約 3dB。</p>
             </div>
         </footer>
     </div>
 
 </body>
 </html>
-
-
